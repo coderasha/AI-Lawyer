@@ -7,3 +7,4 @@ data/embeddings/
 data/logs/
 data/memory/
 EOF
+venv
