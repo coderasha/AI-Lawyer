@@ -1,0 +1,16 @@
+cat <<EOF > requirements.txt
+fastapi
+uvicorn
+langgraph
+langchain
+pydantic
+python-dotenv
+faiss-cpu
+chromadb
+sentence-transformers
+pypdf
+python-docx
+pandas
+pillow
+pytesseract
+EOF
