@@ -13,4 +13,12 @@ pandas
 pillow
 pytesseract
 ollama
+chromadb
+sentence-transformers
+python-docx
+pypdf
+pillow
+pytesseract
+python-multipart
+
 
