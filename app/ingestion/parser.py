@@ -21,5 +21,9 @@ def parse_csv(path):
 
 
 def parse_image(path):
-    img = Image.open(path)
-    return pytesseract.image_to_string(img)
+    try:
+        img = Image.open(path)
+        return pytesseract.image_to_string(img)
+    except Exception:
+        return "OCR failed: could not read image"
+
