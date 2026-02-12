@@ -1,4 +1,4 @@
-cat <<EOF > .gitignore
+
 .env
 __pycache__/
 *.pyc
@@ -6,5 +6,4 @@ models_store/
 data/embeddings/
 data/logs/
 data/memory/
-EOF
 venv
