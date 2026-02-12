@@ -8,26 +8,29 @@ st.set_page_config(page_title="Legal AI Platform", page_icon="⚖️")
 
 st.title("⚖️ Legal AI Platform")
 
-# ---------------- SIDEBAR ---------------- #
+# ---------------- SIDEBAR SETTINGS ---------------- #
 
 st.sidebar.header("Settings")
 mode = st.sidebar.selectbox("Mode", ["AUTO", "MANUAL"])
 
-st.sidebar.divider()
-st.sidebar.header("Upload Knowledge")
+# -------- Permanent Knowledge Upload -------- #
 
-uploaded_file = st.sidebar.file_uploader(
-    "Upload document",
-    type=["pdf", "docx", "csv", "png", "jpg", "jpeg"]
+st.sidebar.divider()
+st.sidebar.header("Teach AI (Permanent Memory)")
+
+knowledge_file = st.sidebar.file_uploader(
+    "Upload lawbook / contract / evidence",
+    type=["pdf", "docx", "csv", "png", "jpg", "jpeg"],
+    key="knowledge_upload"
 )
 
-if uploaded_file:
-    with st.spinner("Learning document..."):
-        files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
+if knowledge_file:
+    with st.spinner("Learning document permanently..."):
+        files = {"file": (knowledge_file.name, knowledge_file.getvalue())}
         res = requests.post(API_UPLOAD, files=files)
 
         if res.status_code == 200:
-            st.sidebar.success("Document learned successfully!")
+            st.sidebar.success("Document permanently learned!")
         else:
             st.sidebar.error("Upload failed")
 
@@ -36,25 +39,34 @@ if uploaded_file:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# display chat history
+# display past messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if msg["role"] == "assistant" and msg.get("meta"):
-            st.caption(msg["meta"])
+
+# -------- Temporary Chat File Upload -------- #
+
+st.divider()
+st.caption("Attach file for this question (optional, not saved permanently)")
+
+chat_file = st.file_uploader(
+    "Attach image/pdf/docx",
+    type=["png", "jpg", "jpeg", "pdf", "docx"],
+    key="chat_file"
+)
 
 # ---------------- CHAT INPUT ---------------- #
 
-if prompt := st.chat_input("Ask a legal question or type /learn ..."):
+if prompt := st.chat_input("Ask legal question or type /learn ..."):
 
     # show user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # learning command
+    # handle learning command
     if prompt.startswith("/learn"):
-        res = requests.post(API_CHAT, json={
+        res = requests.post(API_CHAT, data={
             "message": prompt,
             "mode": mode,
             "model_name": "llama3"
@@ -62,19 +74,25 @@ if prompt := st.chat_input("Ask a legal question or type /learn ..."):
         st.success("Learned successfully")
         st.stop()
 
-    # assistant response streaming
+    # -------- Assistant streaming response -------- #
+
     with st.chat_message("assistant"):
         response_box = st.empty()
         full_text = ""
 
+        files = None
+        if chat_file:
+            files = {"file": (chat_file.name, chat_file.getvalue())}
+
         try:
             with requests.post(
                 API_CHAT,
-                json={
+                data={
                     "message": prompt,
                     "mode": mode,
                     "model_name": "llama3"
                 },
+                files=files,
                 stream=True,
             ) as r:
 
@@ -91,6 +109,5 @@ if prompt := st.chat_input("Ask a legal question or type /learn ..."):
     # save assistant message
     st.session_state.messages.append({
         "role": "assistant",
-        "content": full_text,
-        "meta": f"Mode: {mode}"
+        "content": full_text
     })
