@@ -1,43 +1,52 @@
-import json
 import os
+import json
 from datetime import datetime
-
-REGISTRY_PATH = "memory_store/document_registry.json"
 
 
 class DocumentRegistry:
 
-    def __init__(self):
-        os.makedirs("memory_store", exist_ok=True)
-        if not os.path.exists(REGISTRY_PATH):
-            with open(REGISTRY_PATH, "w") as f:
+    def __init__(self, path="memory_store/registry.json"):
+        self.path = path
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        if not os.path.exists(self.path):
+            with open(self.path, "w") as f:
                 json.dump([], f)
 
-    # -------- add new document --------
-    def add_document(self, filename: str, char_count: int):
+    # ---------------- LOAD ----------------
 
-        with open(REGISTRY_PATH, "r") as f:
-            data = json.load(f)
-
-        entry = {
-            "filename": filename,
-            "characters": char_count,
-            "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-
-        data.append(entry)
-
-        with open(REGISTRY_PATH, "w") as f:
-            json.dump(data, f, indent=2)
-
-    # -------- list documents --------
-    def list_documents(self):
-        with open(REGISTRY_PATH, "r") as f:
+    def _load(self):
+        with open(self.path, "r") as f:
             return json.load(f)
 
-    # -------- last uploaded --------
+    # ---------------- SAVE ----------------
+
+    def _save(self, data):
+        with open(self.path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    # ---------------- ADD DOCUMENT ----------------
+
+    def add_document(self, filename: str, char_count: int):
+
+        data = self._load()
+
+        data.append({
+            "filename": filename,
+            "char_count": char_count,
+            "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+        self._save(data)
+
+    # ---------------- LIST ----------------
+
+    def list_documents(self):
+        return self._load()
+
+    # ---------------- LAST ----------------
+
     def last_document(self):
-        docs = self.list_documents()
-        if not docs:
-            return None
-        return docs[-1]
+        data = self._load()
+        return data[-1] if data else None
