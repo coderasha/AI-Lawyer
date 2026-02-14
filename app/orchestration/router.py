@@ -1,22 +1,39 @@
-from app.models.registry import MODEL_REGISTRY
-
-
 class ModelRouter:
-    def score_model(self, model_data):
-        return (
-            model_data["accuracy"] * 0.5 +
-            model_data["speed"] * 0.2 -
-            model_data["hallucination_risk"] * 0.3
-        )
 
-    def select_model(self):
-        best_model = None
-        best_score = -1
+    def select_model(self, prompt: str) -> str:
+        """
+        Decide which LLM should answer the query
+        based on the nature of the task
+        """
 
-        for name, data in MODEL_REGISTRY.items():
-            score = self.score_model(data)
-            if score > best_score:
-                best_score = score
-                best_model = name
+        prompt_lower = prompt.lower()
 
-        return best_model
+        # ---- Legal reasoning / long answers ----
+        legal_keywords = [
+            "legal", "law", "section", "contract", "agreement",
+            "liable", "liability", "notice", "court", "sue",
+            "breach", "damages", "penalty", "act", "ipc"
+        ]
+
+        # ---- Document analysis ----
+        doc_keywords = [
+            "analyze", "review", "summarize", "explain document",
+            "what does this notice mean"
+        ]
+
+        # ---- Quick factual queries ----
+        simple_keywords = [
+            "define", "meaning", "what is", "who is"
+        ]
+
+        if any(k in prompt_lower for k in legal_keywords):
+            return "llama3"   # best reasoning
+
+        if any(k in prompt_lower for k in doc_keywords):
+            return "llama3"   # document understanding
+
+        if any(k in prompt_lower for k in simple_keywords):
+            return "mistral"  # faster cheaper model
+
+        # default
+        return "llama3"

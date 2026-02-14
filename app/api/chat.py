@@ -1,31 +1,42 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
-from app.models.llm import LLM
-from app.orchestration.router import ModelRouter
+from app.orchestration.graph import run_legal_pipeline
+from app.ingestion.parser import parse_file
+import asyncio
 
 router = APIRouter()
-router_model = ModelRouter()
-
-
-class ChatRequest(BaseModel):
-    message: str
-    mode: str = "AUTO"
-    model_name: str = "llama3"
 
 
 @router.post("/chat")
-def chat(request: ChatRequest):
+async def chat(
+    message: str = Form(...),
+    file: UploadFile | None = File(None),
+):
 
-    model_name = request.model_name
-    if request.mode == "AUTO":
-        model_name = router_model.select_model()
+    context_text = ""
 
-    llm = LLM(model_name)
+    # -------- Read attached document --------
+    if file is not None:
+        content = await file.read()
+        context_text = parse_file(file.filename, content)
 
-    def generate():
-        for token in llm.stream(request.message):
+    final_prompt = message
+
+    if context_text:
+        final_prompt = f"""
+User Question:
+{message}
+
+Attached Document:
+{context_text}
+
+Answer using this document if relevant.
+"""
+
+    # -------- Stream response --------
+    async def stream():
+        async for token in run_legal_pipeline(final_prompt):
             yield token
+            await asyncio.sleep(0.01)
 
-    return StreamingResponse(generate(), media_type="text/plain")
+    return StreamingResponse(stream(), media_type="text/plain")

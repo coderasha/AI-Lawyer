@@ -1,112 +1,97 @@
 import streamlit as st
 import requests
-import base64
 
-API_CHAT = "http://127.0.0.1:8000/chat"
+API_URL = "http://127.0.0.1:8000/chat"
 
-st.set_page_config(page_title="Legal AI Platform", page_icon="⚖️")
+st.set_page_config(page_title="Legal AI", layout="wide")
 
-st.title("⚖️ Legal AI Platform")
+# ---------------- STYLE ----------------
 
-# ---------------- Session ---------------- #
+st.markdown("""
+<style>
+.chat-container {max-width: 900px; margin: auto;}
+.user-msg {
+    background: #DCF8C6;
+    padding: 12px;
+    border-radius: 12px;
+    margin: 8px 0;
+    text-align: right;
+}
+.ai-msg {
+    background: #F1F0F0;
+    padding: 12px;
+    border-radius: 12px;
+    margin: 8px 0;
+    text-align: left;
+}
+.upload-box {
+    border: 1px dashed #aaa;
+    padding: 10px;
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("⚖️ Legal AI Assistant")
+
+# ---------------- SESSION MEMORY ----------------
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# ---------------- Chat history ---------------- #
+# ---------------- DISPLAY CHAT ----------------
 
-chat_container = st.container()
+st.markdown('<div class="chat-container">', unsafe_allow_html=True)
 
-with chat_container:
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+for role, msg in st.session_state.messages:
+    if role == "user":
+        st.markdown(f'<div class="user-msg">{msg}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="ai-msg">{msg}</div>', unsafe_allow_html=True)
 
-# ---------------- Custom ChatGPT Input Bar ---------------- #
+st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("""
-<style>
-.chatbar {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60%;
-    background: white;
-    border-radius: 25px;
-    border: 1px solid #ddd;
-    padding: 10px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+# ---------------- INPUT AREA ----------------
 
-.plus-btn {
-    font-size: 22px;
-    cursor: pointer;
-    padding: 6px 12px;
-    border-radius: 10px;
-}
+col1, col2 = st.columns([8,1])
 
-.input-box {
-    flex-grow: 1;
-    border: none;
-    outline: none;
-    font-size: 16px;
-}
+with col1:
+    user_input = st.text_input("Message", label_visibility="collapsed", placeholder="Ask your legal question...")
 
-.send-btn {
-    cursor: pointer;
-    font-weight: bold;
-}
-</style>
+with col2:
+    uploaded_file = st.file_uploader("Attach", label_visibility="collapsed")
 
-<div class="chatbar">
-    <span class="plus-btn">➕</span>
-    <input id="msg" class="input-box" placeholder="Ask legal question..."/>
-    <span class="send-btn">➤</span>
-</div>
-""", unsafe_allow_html=True)
+send = st.button("Send")
 
-# ---------------- Hidden uploader ---------------- #
+# ---------------- SEND MESSAGE ----------------
 
-uploaded_file = st.file_uploader(
-    "Upload file",
-    type=["png","jpg","jpeg","pdf","docx"],
-    label_visibility="collapsed"
-)
+if send and user_input:
 
-# ---------------- Message Input ---------------- #
+    # show user message
+    st.session_state.messages.append(("user", user_input))
+    st.rerun()
 
-prompt = st.text_input("hidden", label_visibility="collapsed")
+if len(st.session_state.messages) > 0 and st.session_state.messages[-1][0] == "user":
 
-if prompt:
+    prompt = st.session_state.messages[-1][1]
 
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with chat_container:
-        with st.chat_message("user"):
-            st.markdown(prompt)
+    files = {}
+    data = {"message": prompt}
 
-    files = None
     if uploaded_file:
-        files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
+        files["file"] = (uploaded_file.name, uploaded_file.getvalue())
 
-    with chat_container:
-        with st.chat_message("assistant"):
-            response_box = st.empty()
-            full_text = ""
+    # streaming request
+    response = requests.post(API_URL, data=data, files=files, stream=True)
 
-            with requests.post(
-                API_CHAT,
-                data={"message": prompt, "mode": "AUTO", "model_name": "llama3"},
-                files=files,
-                stream=True,
-            ) as r:
+    ai_response = ""
+    placeholder = st.empty()
 
-                for chunk in r.iter_content(chunk_size=1024):
-                    if chunk:
-                        text = chunk.decode("utf-8")
-                        full_text += text
-                        response_box.markdown(full_text)
+    for chunk in response.iter_content(chunk_size=1024):
+        if chunk:
+            text = chunk.decode()
+            ai_response += text
+            placeholder.markdown(f'<div class="ai-msg">{ai_response}</div>', unsafe_allow_html=True)
 
-    st.session_state.messages.append({"role": "assistant", "content": full_text})
+    st.session_state.messages.append(("ai", ai_response))
+    st.rerun()
